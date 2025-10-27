@@ -7,8 +7,14 @@ import traceback
 app = Flask(__name__)
 CORS(app)
 
-# --- Load model ---
-model = pickle.load(open("model.pkl", "rb"))
+# --- Load model safely ---
+try:
+    loaded = pickle.load(open("model.pkl", "rb"))
+    model = loaded["model"] if isinstance(loaded, dict) and "model" in loaded else loaded
+    print("✅ Model loaded successfully!")
+except Exception as e:
+    print("❌ Error loading model:", e)
+    model = None
 
 # --- Example mappings (must match training preprocessing) ---
 gender_map = {"Male": 0, "Female": 1}
@@ -18,31 +24,32 @@ job_map = {"Data Scientist": 0, "Software Engineer": 1, "Manager": 2, "Analyst":
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
-        data = request.get_json()
+        if model is None:
+            return jsonify({'error': 'Model not loaded on server.'}), 500
 
-        # Extract fields
+        data = request.get_json()
+        print("📥 Received:", data)
+
+        # Extract & encode
         age = float(data['Age'])
         gender = gender_map.get(data['Gender'], 0)
         education = education_map.get(data['Education Level'], 0)
         job = job_map.get(data['Job Title'], 0)
         exp = float(data['Years of Experience'])
 
-        # Prepare numeric input for model
         X = np.array([[age, gender, education, job, exp]])
-
-        # Predict
         salary = model.predict(X)[0]
 
-        return jsonify({'prediction': float(salary)})
+        return jsonify({'Predicted Salary': float(round(salary, 2))})
 
     except Exception as e:
-        print("🔥 Error:", e)
+        print("🔥 Error in /predict:", e)
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/')
 def home():
-    return "Salary prediction API is running ✅"
+    return "✅ Salary prediction API is running fine!"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
