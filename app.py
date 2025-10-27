@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 
 app = Flask(__name__)
+CORS(app)
 
 # Load model and encoders
 with open('model.pkl', 'rb') as f:
